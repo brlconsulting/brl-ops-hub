@@ -17,7 +17,7 @@ const REFRESH_MS = 5 * 60 * 1000;
 export default function App() {
   const [config, setConfig] = useState({
     domain: localStorage.getItem('fd_domain') || 'brl',
-    apiKey: localStorage.getItem('fd_apikey') || '',
+    apiKey: localStorage.getItem('fd_apikey') || 'pwvFRPDL22HndR45C0AV',
   });
   const [tickets, setTickets] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -25,7 +25,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [showSettings, setShowSettings] = useState(!localStorage.getItem('fd_apikey'));
+  const [showSettings, setShowSettings] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!config.apiKey) return;
@@ -92,17 +92,7 @@ export default function App() {
         </div>
       )}
 
-      {!config.apiKey && !showSettings && (
-        <div className="max-w-screen-2xl mx-auto px-4 pt-16 text-center">
-          <p className="text-gray-500 text-lg">Configure a conexão com o FreshDesk para começar.</p>
-          <button onClick={() => setShowSettings(true)}
-            className="mt-4 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-medium">
-            Configurar agora
-          </button>
-        </div>
-      )}
-
-      {config.apiKey && (
+      {(
         <main className="max-w-screen-2xl mx-auto px-4 py-5 space-y-5">
 
           {/* 1 — Visão geral: mini-stats + 3 donuts */}
