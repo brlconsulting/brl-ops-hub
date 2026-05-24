@@ -1,0 +1,133 @@
+import { useState, useEffect, useCallback } from 'react';
+import Header from './components/Header';
+import ChartsSection from './components/ChartsSection';
+import TicketsByAgent from './components/TicketsByAgent';
+import TicketsByCustomer from './components/TicketsByCustomer';
+import UnassignedPanel from './components/UnassignedPanel';
+import SLAPanel from './components/SLAPanel';
+import UrgentPanel from './components/UrgentPanel';
+import ProjectsPanel from './components/ProjectsPanel';
+import SettingsModal from './components/SettingsModal';
+import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets } from './api/freshdesk';
+
+const PROJETOS_GROUP_ID = 22000159334;
+
+const REFRESH_MS = 5 * 60 * 1000;
+
+export default function App() {
+  const [config, setConfig] = useState({
+    domain: localStorage.getItem('fd_domain') || 'brl',
+    apiKey: localStorage.getItem('fd_apikey') || '',
+  });
+  const [tickets, setTickets] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [projectTickets, setProjectTickets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [showSettings, setShowSettings] = useState(!localStorage.getItem('fd_apikey'));
+
+  const refresh = useCallback(async () => {
+    if (!config.apiKey) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [t, a, p] = await Promise.all([
+        fetchAllOpenTickets(config.domain, config.apiKey),
+        fetchAgents(config.domain, config.apiKey),
+        fetchProjectTickets(config.domain, config.apiKey, PROJETOS_GROUP_ID),
+      ]);
+      setTickets(t);
+      setAgents(a);
+      setProjectTickets(p);
+      setLastUpdated(new Date());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [config]);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, REFRESH_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  const saveConfig = (cfg) => {
+    localStorage.setItem('fd_domain', cfg.domain);
+    localStorage.setItem('fd_apikey', cfg.apiKey);
+    setConfig(cfg);
+    setShowSettings(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100">
+      <Header
+        loading={loading}
+        lastUpdated={lastUpdated}
+        onRefresh={refresh}
+        onSettings={() => setShowSettings(true)}
+      />
+
+      {showSettings && (
+        <SettingsModal
+          config={config}
+          onSave={saveConfig}
+          onClose={() => config.apiKey && setShowSettings(false)}
+        />
+      )}
+
+      {error && (
+        <div className="max-w-screen-2xl mx-auto px-4 pt-3">
+          <div className="p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm flex items-start gap-2">
+            <span className="text-lg shrink-0">⚠️</span>
+            <div>
+              <strong>Erro ao conectar ao FreshDesk:</strong> {error}
+              <button onClick={() => setShowSettings(true)} className="ml-2 underline hover:text-red-800">
+                Verificar configurações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!config.apiKey && !showSettings && (
+        <div className="max-w-screen-2xl mx-auto px-4 pt-16 text-center">
+          <p className="text-gray-500 text-lg">Configure a conexão com o FreshDesk para começar.</p>
+          <button onClick={() => setShowSettings(true)}
+            className="mt-4 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-medium">
+            Configurar agora
+          </button>
+        </div>
+      )}
+
+      {config.apiKey && (
+        <main className="max-w-screen-2xl mx-auto px-4 py-5 space-y-5">
+
+          {/* 1 — Visão geral: mini-stats + 3 donuts */}
+          <ChartsSection tickets={tickets} agents={agents} />
+
+          {/* 2 — SLA violado + Urgentes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <SLAPanel tickets={tickets} domain={config.domain} />
+            <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} />
+          </div>
+
+          {/* 3 — Sem agente (faixa completa) */}
+          <UnassignedPanel tickets={tickets} domain={config.domain} />
+
+          {/* 4 — Tickets por Agente */}
+          <TicketsByAgent tickets={tickets} agents={agents} domain={config.domain} />
+
+          {/* 5 — Tickets por Cliente */}
+          <TicketsByCustomer tickets={tickets} domain={config.domain} />
+
+          {/* 6 — Projetos */}
+          <ProjectsPanel tickets={projectTickets} agents={agents} domain={config.domain} />
+
+        </main>
+      )}
+    </div>
+  );
+}

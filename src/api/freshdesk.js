@@ -1,0 +1,89 @@
+function base(domain) {
+  return `https://${domain}.freshdesk.com/api/v2`;
+}
+
+function authHeaders(apiKey) {
+  return {
+    Authorization: `Basic ${btoa(`${apiKey}:X`)}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function apiGet(domain, apiKey, path, params = {}) {
+  const url = new URL(`${base(domain)}${path}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  const res = await fetch(url.toString(), { headers: authHeaders(apiKey) });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`FreshDesk ${res.status}: ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+// Fetches all tickets excluding Resolved (4) and Closed (5)
+export async function fetchAllOpenTickets(domain, apiKey) {
+  const results = [];
+  let page = 1;
+  while (true) {
+    const batch = await apiGet(domain, apiKey, '/tickets', {
+      per_page: 100,
+      page,
+      include: 'requester',
+    });
+    results.push(...batch.filter((t) => t.status !== 4 && t.status !== 5));
+    if (batch.length < 100) break;
+    page++;
+  }
+  return results;
+}
+
+export async function fetchAgents(domain, apiKey) {
+  const results = [];
+  let page = 1;
+  while (true) {
+    const batch = await apiGet(domain, apiKey, '/agents', { per_page: 100, page });
+    results.push(...batch);
+    if (batch.length < 100) break;
+    page++;
+  }
+  return results;
+}
+
+// Busca tickets do grupo PROJETOS via search API (suporta tickets antigos)
+// Exclui Resolvidos (4) e Fechados (5) e enriquece com dados do requester
+export async function fetchProjectTickets(domain, apiKey, groupId) {
+  const results = [];
+  let page = 1;
+  const query = encodeURIComponent(`"group_id:${groupId}"`);
+
+  while (true) {
+    const url = `https://${domain}.freshdesk.com/api/v2/search/tickets?query=${query}&page=${page}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${btoa(`${apiKey}:X`)}` },
+    });
+    if (!res.ok) throw new Error(`FreshDesk search ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    const batch = data.results || [];
+    results.push(...batch.filter(t => t.status !== 4 && t.status !== 5));
+    if (batch.length < 30 || results.length >= data.total) break;
+    page++;
+  }
+
+  // search API não suporta include=requester — buscar contatos individualmente
+  const uniqueIds = [...new Set(results.map(t => t.requester_id).filter(Boolean))];
+  const contactMap = {};
+  await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        contactMap[id] = await apiGet(domain, apiKey, `/contacts/${id}`);
+      } catch {
+        // ignora erros individuais
+      }
+    })
+  );
+
+  return results.map(t => ({
+    ...t,
+    requester: contactMap[t.requester_id] || null,
+  }));
+}

@@ -1,0 +1,84 @@
+import { ticketUrl, dueDateLabel } from '../utils/helpers';
+
+export default function UrgentPanel({ tickets, agents, domain }) {
+  const agentMap = new Map(agents.map((a) => [a.id, a.contact?.name || `Agente ${a.id}`]));
+
+  const urgents = tickets
+    .filter((t) => t.priority === 4)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-4">
+      <h2 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
+        <span>🔥</span> Tickets Urgentes
+        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full
+          ${urgents.length === 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          {urgents.length}
+        </span>
+      </h2>
+
+      {urgents.length === 0 ? (
+        <p className="text-sm text-green-600 text-center py-6">Nenhum ticket urgente</p>
+      ) : (
+        <div className="max-h-[320px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-gray-500 uppercase border-b sticky top-0 bg-white">
+              <tr>
+                <th className="text-left py-2 px-1">#</th>
+                <th className="text-left py-2 px-1">Assunto</th>
+                <th className="text-left py-2 px-1">Cliente</th>
+                <th className="text-left py-2 px-1">Agente</th>
+                <th className="text-left py-2 px-1">SLA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {urgents.map((t) => {
+                const due = dueDateLabel(t.due_by);
+                const isOverdue = t.due_by && new Date(t.due_by) < new Date();
+                return (
+                  <tr
+                    key={t.id}
+                    className={`border-b border-gray-50 hover:bg-red-50 ${isOverdue ? 'bg-red-50/50' : ''}`}
+                  >
+                    <td className="py-1.5 px-1 text-gray-400 text-xs">
+                      <a
+                        href={ticketUrl(domain, t.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-blue-600 font-mono"
+                      >
+                        #{t.id}
+                      </a>
+                    </td>
+                    <td className="py-1.5 px-1 max-w-[160px]">
+                      <a
+                        href={ticketUrl(domain, t.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-800 font-medium hover:text-blue-600 truncate block"
+                      >
+                        {t.subject}
+                      </a>
+                    </td>
+                    <td className="py-1.5 px-1 text-gray-500 text-xs truncate max-w-[100px]">
+                      {t.requester?.name || '—'}
+                    </td>
+                    <td className="py-1.5 px-1 text-xs truncate max-w-[90px]">
+                      {t.responder_id
+                        ? <span className="text-gray-600">{agentMap.get(t.responder_id) || '—'}</span>
+                        : <span className="text-amber-500 font-medium">Sem agente</span>
+                      }
+                    </td>
+                    <td className={`py-1.5 px-1 text-xs whitespace-nowrap ${due.cls}`}>
+                      {due.text}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
