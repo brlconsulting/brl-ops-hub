@@ -87,3 +87,25 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
     requester: contactMap[t.requester_id] || null,
   }));
 }
+
+// Retorna tickets criados nos últimos `days` dias que não têm nenhuma hora registrada
+export async function fetchTicketsWithoutTime(domain, apiKey, tickets, days = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const recent = tickets.filter(t => new Date(t.created_at) >= cutoff);
+  if (recent.length === 0) return [];
+
+  const results = await Promise.all(
+    recent.map(async (t) => {
+      try {
+        const entries = await apiGet(domain, apiKey, `/tickets/${t.id}/time_entries`);
+        return entries.length === 0 ? t : null;
+      } catch {
+        return null; // ignora erros individuais
+      }
+    })
+  );
+
+  return results.filter(Boolean);
+}

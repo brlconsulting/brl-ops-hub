@@ -7,8 +7,10 @@ import UnassignedPanel from './components/UnassignedPanel';
 import SLAPanel from './components/SLAPanel';
 import UrgentPanel from './components/UrgentPanel';
 import ProjectsPanel from './components/ProjectsPanel';
+import ThomsonPanel from './components/ThomsonPanel';
+import NoTimePanel from './components/NoTimePanel';
 import SettingsModal from './components/SettingsModal';
-import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets } from './api/freshdesk';
+import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime } from './api/freshdesk';
 
 const PROJETOS_GROUP_ID = 22000159334;
 
@@ -22,6 +24,8 @@ export default function App() {
   const [tickets, setTickets] = useState([]);
   const [agents, setAgents] = useState([]);
   const [projectTickets, setProjectTickets] = useState([]);
+  const [noTimeTickets, setNoTimeTickets] = useState([]);
+  const [noTimeLoading, setNoTimeLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -41,6 +45,14 @@ export default function App() {
       setAgents(a);
       setProjectTickets(p);
       setLastUpdated(new Date());
+
+      // Busca horas em segundo plano (não bloqueia o painel principal)
+      setNoTimeLoading(true);
+      fetchTicketsWithoutTime(config.domain, config.apiKey, t)
+        .then(nt => setNoTimeTickets(nt))
+        .catch(() => {})
+        .finally(() => setNoTimeLoading(false));
+
     } catch (e) {
       setError(e.message);
     } finally {
@@ -104,16 +116,22 @@ export default function App() {
             <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} />
           </div>
 
-          {/* 3 — Sem agente (faixa completa) */}
+          {/* 3 — Aguardando Thomson + Sem Horas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <ThomsonPanel tickets={tickets} agents={agents} domain={config.domain} />
+            <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} domain={config.domain} />
+          </div>
+
+          {/* 4 — Sem agente (faixa completa) */}
           <UnassignedPanel tickets={tickets} domain={config.domain} />
 
-          {/* 4 — Tickets por Agente */}
+          {/* 5 — Tickets por Agente */}
           <TicketsByAgent tickets={tickets} agents={agents} domain={config.domain} />
 
-          {/* 5 — Tickets por Cliente */}
+          {/* 6 — Tickets por Cliente */}
           <TicketsByCustomer tickets={tickets} domain={config.domain} />
 
-          {/* 6 — Projetos */}
+          {/* 7 — Projetos */}
           <ProjectsPanel tickets={projectTickets} agents={agents} domain={config.domain} />
 
         </main>
