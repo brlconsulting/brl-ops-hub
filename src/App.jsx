@@ -9,6 +9,7 @@ import UrgentPanel from './components/UrgentPanel';
 import ProjectsPanel from './components/ProjectsPanel';
 import ThomsonPanel from './components/ThomsonPanel';
 import NoTimePanel from './components/NoTimePanel';
+import ScheduledPanel from './components/ScheduledPanel';
 import SettingsModal from './components/SettingsModal';
 import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime } from './api/freshdesk';
 
@@ -133,6 +134,9 @@ export default function App() {
 
           {/* 7 — Projetos */}
           <ProjectsPanel tickets={projectTickets} agents={agents} domain={config.domain} />
+
+          {/* 8 — Atividade Agendada */}
+          <ScheduledPanel tickets={tickets} agents={agents} domain={config.domain} />
 
         </main>
       )}
