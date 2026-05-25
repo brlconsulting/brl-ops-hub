@@ -10,7 +10,7 @@ export default function ThomsonPanel({ tickets, agents, domain }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-4">
       <h2 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
-        <span>🛠️</span> Em Desenvolvimento
+        <span>🛠️</span> Ag. Thomson e Em Desenvolvimento
         <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full
           ${items.length === 0 ? 'bg-green-100 text-green-700' : 'bg-teal-100 text-teal-700'}`}>
           {items.length}
@@ -18,7 +18,7 @@ export default function ThomsonPanel({ tickets, agents, domain }) {
       </h2>
 
       {items.length === 0 ? (
-        <p className="text-sm text-green-600 text-center py-6">Nenhum ticket em desenvolvimento</p>
+        <p className="text-sm text-green-600 text-center py-6">Nenhum ticket aguardando Thomson ou em desenvolvimento</p>
       ) : (
         <div className="max-h-[320px] overflow-y-auto">
           <table className="w-full text-sm">
