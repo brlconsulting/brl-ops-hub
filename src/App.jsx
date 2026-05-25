@@ -110,17 +110,17 @@ export default function App() {
           {/* 1 — Visão geral: mini-stats + 3 donuts */}
           <ChartsSection tickets={tickets} agents={agents} />
 
-          {/* 2 — SLA violado + Urgentes */}
+          {/* 2 — SLA violado | Urgentes + Thomson (empilhados) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <SLAPanel tickets={tickets} domain={config.domain} />
-            <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} />
+            <div className="flex flex-col gap-5">
+              <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} />
+              <ThomsonPanel tickets={tickets} agents={agents} domain={config.domain} />
+            </div>
           </div>
 
-          {/* 3 — Aguardando Thomson + Sem Horas */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <ThomsonPanel tickets={tickets} agents={agents} domain={config.domain} />
-            <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} domain={config.domain} />
-          </div>
+          {/* 3 — Sem Horas Registradas */}
+          <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} domain={config.domain} />
 
           {/* 4 — Sem agente (faixa completa) */}
           <UnassignedPanel tickets={tickets} domain={config.domain} />
