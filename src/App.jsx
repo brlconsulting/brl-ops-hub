@@ -120,7 +120,7 @@ export default function App() {
           </div>
 
           {/* 3 — Sem Horas Registradas */}
-          <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} domain={config.domain} />
+          <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} agents={agents} domain={config.domain} />
 
           {/* 4 — Sem agente (faixa completa) */}
           <UnassignedPanel tickets={tickets} domain={config.domain} />

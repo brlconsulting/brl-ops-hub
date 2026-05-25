@@ -5,7 +5,8 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
 
-export default function NoTimePanel({ tickets, loading, domain }) {
+export default function NoTimePanel({ tickets, loading, agents = [], domain }) {
+  const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
   return (
     <div className="bg-white rounded-xl shadow-sm p-4">
       <h2 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
@@ -37,7 +38,7 @@ export default function NoTimePanel({ tickets, loading, domain }) {
               <tr>
                 <th className="text-left py-2 px-1">#</th>
                 <th className="text-left py-2 px-1">Assunto</th>
-                <th className="text-left py-2 px-1">Cliente</th>
+                <th className="text-left py-2 px-1">Agente</th>
                 <th className="text-left py-2 px-1">Status</th>
                 <th className="text-left py-2 px-1">Criado</th>
               </tr>
@@ -62,8 +63,11 @@ export default function NoTimePanel({ tickets, loading, domain }) {
                         {t.subject}
                       </a>
                     </td>
-                    <td className="py-1.5 px-1 text-xs text-gray-500 truncate max-w-[110px]">
-                      {t.requester?.name || '—'}
+                    <td className="py-1.5 px-1 text-xs truncate max-w-[110px]">
+                      {t.responder_id
+                        ? <span className="text-gray-600">{agentMap.get(t.responder_id) || '—'}</span>
+                        : <span className="text-amber-500 font-medium">Sem agente</span>
+                      }
                     </td>
                     <td className="py-1.5 px-1 text-xs text-gray-500 whitespace-nowrap">
                       {STATUS_NAMES[t.status] || `Status ${t.status}`}
