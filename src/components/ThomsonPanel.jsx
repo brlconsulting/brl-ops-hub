@@ -1,16 +1,16 @@
-import { ticketUrl, PRIORITY_COLORS, PRIORITY_NAMES } from '../utils/helpers';
+import { ticketUrl, PRIORITY_COLORS, PRIORITY_NAMES, STATUS_NAMES } from '../utils/helpers';
 
 export default function ThomsonPanel({ tickets, agents, domain }) {
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
 
   const items = tickets
-    .filter(t => t.status === 7)
+    .filter(t => t.status === 7 || t.status === 9)
     .sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at)); // mais antigos primeiro
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-4">
       <h2 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
-        <span>⏳</span> Aguardando Thomson
+        <span>🛠️</span> Em Desenvolvimento
         <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full
           ${items.length === 0 ? 'bg-green-100 text-green-700' : 'bg-teal-100 text-teal-700'}`}>
           {items.length}
@@ -18,7 +18,7 @@ export default function ThomsonPanel({ tickets, agents, domain }) {
       </h2>
 
       {items.length === 0 ? (
-        <p className="text-sm text-green-600 text-center py-6">Nenhum ticket aguardando Thomson</p>
+        <p className="text-sm text-green-600 text-center py-6">Nenhum ticket em desenvolvimento</p>
       ) : (
         <div className="max-h-[320px] overflow-y-auto">
           <table className="w-full text-sm">
@@ -26,6 +26,7 @@ export default function ThomsonPanel({ tickets, agents, domain }) {
               <tr>
                 <th className="text-left py-2 px-1">#</th>
                 <th className="text-left py-2 px-1">Assunto</th>
+                <th className="text-left py-2 px-1">Status</th>
                 <th className="text-left py-2 px-1">Cliente</th>
                 <th className="text-left py-2 px-1">Agente</th>
                 <th className="text-left py-2 px-1">Prior.</th>
@@ -51,6 +52,12 @@ export default function ThomsonPanel({ tickets, agents, domain }) {
                         className="text-gray-800 font-medium hover:text-blue-600 truncate block">
                         {t.subject}
                       </a>
+                    </td>
+                    <td className="py-1.5 px-1 text-xs whitespace-nowrap">
+                      {t.status === 7
+                        ? <span className="text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded-full">Ag. Thomson</span>
+                        : <span className="text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded-full">Em Desenv.</span>
+                      }
                     </td>
                     <td className="py-1.5 px-1 text-xs text-gray-500 truncate max-w-[110px]">
                       {t.requester?.name || '—'}
