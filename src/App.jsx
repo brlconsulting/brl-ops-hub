@@ -10,8 +10,9 @@ import ProjectsPanel from './components/ProjectsPanel';
 import ThomsonPanel from './components/ThomsonPanel';
 import NoTimePanel from './components/NoTimePanel';
 import ScheduledPanel from './components/ScheduledPanel';
+import TimeMatrixPanel from './components/TimeMatrixPanel';
 import SettingsModal from './components/SettingsModal';
-import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime } from './api/freshdesk';
+import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime, fetchMonthlyTimeEntries } from './api/freshdesk';
 
 const PROJETOS_GROUP_ID = 22000159334;
 
@@ -27,6 +28,8 @@ export default function App() {
   const [projectTickets, setProjectTickets] = useState([]);
   const [noTimeTickets, setNoTimeTickets] = useState([]);
   const [noTimeLoading, setNoTimeLoading] = useState(false);
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [timeMatrixLoading, setTimeMatrixLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -47,12 +50,18 @@ export default function App() {
       setProjectTickets(p);
       setLastUpdated(new Date());
 
-      // Busca horas em segundo plano (não bloqueia o painel principal)
+      // Busca em segundo plano: tickets sem horas + matriz mensal (não bloqueiam o dashboard)
       setNoTimeLoading(true);
       fetchTicketsWithoutTime(config.domain, config.apiKey, t)
         .then(nt => setNoTimeTickets(nt))
         .catch(() => {})
         .finally(() => setNoTimeLoading(false));
+
+      setTimeMatrixLoading(true);
+      fetchMonthlyTimeEntries(config.domain, config.apiKey)
+        .then(te => setTimeEntries(te))
+        .catch(() => {})
+        .finally(() => setTimeMatrixLoading(false));
 
     } catch (e) {
       setError(e.message);
@@ -137,6 +146,9 @@ export default function App() {
 
           {/* 8 — Atividade Agendada */}
           <ScheduledPanel tickets={tickets} agents={agents} domain={config.domain} />
+
+          {/* 9 — Horas por Consultor */}
+          <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} />
 
         </main>
       )}

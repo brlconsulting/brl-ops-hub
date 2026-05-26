@@ -88,6 +88,33 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
   }));
 }
 
+// Busca todas as horas registradas no mês atual
+export async function fetchMonthlyTimeEntries(domain, apiKey) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-indexed
+
+  const from = `${year}-${String(month).padStart(2, '0')}-01`;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear  = month === 12 ? year + 1 : year;
+  const to = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+
+  const results = [];
+  let page = 1;
+  while (true) {
+    const batch = await apiGet(domain, apiKey, '/time_entries', {
+      'executed_at[gt]': from,
+      'executed_at[lt]': to,
+      per_page: 100,
+      page,
+    });
+    results.push(...batch);
+    if (batch.length < 100) break;
+    page++;
+  }
+  return results;
+}
+
 // Retorna tickets criados nos últimos `days` dias que não têm nenhuma hora registrada
 export async function fetchTicketsWithoutTime(domain, apiKey, tickets, days = 30) {
   const cutoff = new Date();
