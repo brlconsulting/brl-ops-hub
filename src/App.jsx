@@ -60,7 +60,7 @@ export default function App() {
       setTimeMatrixLoading(true);
       fetchMonthlyTimeEntries(config.domain, config.apiKey)
         .then(te => setTimeEntries(te))
-        .catch(() => {})
+        .catch(err => console.error('fetchMonthlyTimeEntries:', err))
         .finally(() => setTimeMatrixLoading(false));
 
     } catch (e) {

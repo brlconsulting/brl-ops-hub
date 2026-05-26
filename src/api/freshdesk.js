@@ -89,29 +89,34 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
 }
 
 // Busca todas as horas registradas no mês atual
+// (FreshDesk não suporta filtro por data em /time_entries — filtramos no cliente)
 export async function fetchMonthlyTimeEntries(domain, apiKey) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-indexed
-
-  const from = `${year}-${String(month).padStart(2, '0')}-01`;
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear  = month === 12 ? year + 1 : year;
-  const to = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  const currentYear  = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-indexed
 
   const results = [];
   let page = 1;
-  while (true) {
+
+  while (page <= 30) { // limite de segurança: 3000 entradas
     const batch = await apiGet(domain, apiKey, '/time_entries', {
-      'executed_at[gt]': from,
-      'executed_at[lt]': to,
       per_page: 100,
       page,
     });
-    results.push(...batch);
+
+    if (batch.length === 0) break;
+
+    // Filtra apenas entradas do mês atual
+    for (const e of batch) {
+      if (!e.executed_at) continue;
+      const [y, m] = e.executed_at.split('T')[0].split('-').map(Number);
+      if (y === currentYear && m === currentMonth) results.push(e);
+    }
+
     if (batch.length < 100) break;
     page++;
   }
+
   return results;
 }
 
