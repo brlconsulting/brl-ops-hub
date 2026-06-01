@@ -1,3 +1,5 @@
+import { getDisplayMonth } from '../api/freshdesk';
+
 // Converte "HH:MM" → minutos
 function toMins(timeStr) {
   if (!timeStr) return 0;
@@ -18,14 +20,19 @@ function dayOf(isoStr) {
 }
 
 export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
-  const now   = new Date();
-  const year  = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
-  const today = now.getDate();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const now = new Date();
+  const { year, month } = getDisplayMonth(); // month é 1-indexed
+
+  // "hoje" só faz sentido se estamos exibindo o mês atual
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const today       = isCurrentMonth ? now.getDate() : -1; // -1 = sem destaque
+  const currentDay  = now.getDate();
+
+  const daysInMonth = new Date(year, month, 0).getDate(); // last day of month
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  const monthLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(year, month - 1, 1)
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   // Mapa agentId → nome
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
@@ -120,8 +127,9 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
                     </td>
                     {days.map(d => {
                       const mins    = agentDays[d] || 0;
-                      const isPast  = d < today;
                       const isToday = d === today;
+                      // Passado: mês anterior = todos os dias; mês atual = antes de hoje
+                      const isPast  = !isCurrentMonth || d < currentDay;
                       let cellCls = 'text-gray-300'; // futuro sem entrada
                       if (isToday)       cellCls = mins > 0 ? 'text-blue-700 font-semibold' : 'text-blue-300';
                       else if (mins > 0) cellCls = 'text-gray-700';

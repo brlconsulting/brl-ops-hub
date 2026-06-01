@@ -88,12 +88,22 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
   }));
 }
 
-// Busca todas as horas registradas no mês atual
-// (FreshDesk não suporta filtro por data em /time_entries — filtramos no cliente)
-export async function fetchMonthlyTimeEntries(domain, apiKey) {
+// Retorna { year, month } do mês a exibir:
+// até dia 10 → mês anterior; após dia 10 → mês atual
+export function getDisplayMonth() {
   const now = new Date();
-  const currentYear  = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-indexed
+  if (now.getDate() <= 10) {
+    // mês anterior (getMonth() 0-indexed atual = mês anterior 1-indexed)
+    if (now.getMonth() === 0) return { year: now.getFullYear() - 1, month: 12 };
+    return { year: now.getFullYear(), month: now.getMonth() }; // 1-indexed prev
+  }
+  return { year: now.getFullYear(), month: now.getMonth() + 1 }; // 1-indexed current
+}
+
+// Busca horas do mês de exibição (anterior ou atual conforme getDisplayMonth)
+// FreshDesk não suporta filtro por data em /time_entries — filtramos no cliente
+export async function fetchMonthlyTimeEntries(domain, apiKey) {
+  const { year: targetYear, month: targetMonth } = getDisplayMonth();
 
   const results = [];
   let page = 1;
@@ -106,11 +116,10 @@ export async function fetchMonthlyTimeEntries(domain, apiKey) {
 
     if (batch.length === 0) break;
 
-    // Filtra apenas entradas do mês atual
     for (const e of batch) {
       if (!e.executed_at) continue;
       const [y, m] = e.executed_at.split('T')[0].split('-').map(Number);
-      if (y === currentYear && m === currentMonth) results.push(e);
+      if (y === targetYear && m === targetMonth) results.push(e);
     }
 
     if (batch.length < 100) break;
