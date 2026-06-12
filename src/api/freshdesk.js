@@ -88,6 +88,44 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
   }));
 }
 
+// Auditoria de um único chamado: busca conversas e horas registradas pelo ticket_id
+export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDateStr, endDateStr) {
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end   = new Date(endDateStr   + 'T23:59:59');
+
+  const [ticket, convs, timeEntries] = await Promise.all([
+    apiGet(domain, apiKey, `/tickets/${ticketId}`, { include: 'requester' }),
+    apiGet(domain, apiKey, `/tickets/${ticketId}/conversations`, { per_page: 100 }),
+    apiGet(domain, apiKey, `/tickets/${ticketId}/time_entries`,  { per_page: 100 }),
+  ]);
+
+  // Dias com horas registradas no período
+  const timeDays = {};
+  for (const e of timeEntries) {
+    if (!e.executed_at) continue;
+    const d = new Date(e.executed_at.split('T')[0] + 'T12:00:00');
+    if (d >= start && d <= end) timeDays[e.executed_at.split('T')[0]] = true;
+  }
+
+  // Conversas de agente no período
+  const agentConvs = [];
+  for (const c of convs) {
+    if (c.incoming) continue;
+    const d = new Date(c.created_at);
+    if (d < start || d > end) continue;
+    agentConvs.push({
+      dateStr: c.created_at.split('T')[0],
+      agentId: c.user_id,
+      snippet: (c.body_text || '').replace(/\s+/g, ' ').trim().slice(0, 140) || '(sem texto)',
+    });
+  }
+  agentConvs.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+  const missingDays = agentConvs.filter(c => !timeDays[c.dateStr]).map(c => c.dateStr);
+
+  return { ticket, detail: { convs: agentConvs, timeDays }, missingDays };
+}
+
 // Auditoria de horas: tickets com interação de agente no período sem horas lançadas
 // Retorna { missing: [...], ticketDetails: { [id]: { convs, timeDays } } }
 export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, onProgress) {
