@@ -109,10 +109,11 @@ export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDate
   }
 
   // Conversas de agente no período
-  // Considera interação de agente se: incoming=false OU user_id pertence a um agente conhecido
+  // Interação de agente: incoming=false OU remetente não é o solicitante do ticket
+  // (cobre respostas via e-mail externo onde FreshDesk marca incoming=true mesmo sendo do agente)
   const agentConvs = [];
   for (const c of convs) {
-    const isAgentMsg = !c.incoming || (agentIds?.has(c.user_id));
+    const isAgentMsg = !c.incoming || (c.user_id && c.user_id !== ticket.requester_id);
     if (!isAgentMsg) continue;
     const d = new Date(c.created_at);
     if (d < start || d > end) continue;
@@ -191,8 +192,8 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
         const agentDays  = {}; // dateStr → agentId (para detectar lacunas)
 
         for (const c of convs) {
-          // Interação de agente: incoming=false OU user_id é agente conhecido (e-mail externo)
-          const isAgentMsg = !c.incoming || (agentIds?.has(c.user_id));
+          // Interação de agente: incoming=false OU remetente não é o solicitante do ticket
+          const isAgentMsg = !c.incoming || (c.user_id && c.user_id !== ticket.requester_id);
           if (!isAgentMsg) continue;
           const d = new Date(c.created_at);
           if (d < start || d > end) continue;
