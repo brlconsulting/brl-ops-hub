@@ -89,7 +89,8 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
 }
 
 // Auditoria de um único chamado: busca conversas e horas registradas pelo ticket_id
-export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDateStr, endDateStr) {
+// agentIds: Set de IDs de agentes — detecta interação mesmo quando incoming=true (resposta por e-mail externo)
+export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDateStr, endDateStr, agentIds) {
   const start = new Date(startDateStr + 'T00:00:00');
   const end   = new Date(endDateStr   + 'T23:59:59');
 
@@ -108,9 +109,11 @@ export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDate
   }
 
   // Conversas de agente no período
+  // Considera interação de agente se: incoming=false OU user_id pertence a um agente conhecido
   const agentConvs = [];
   for (const c of convs) {
-    if (c.incoming) continue;
+    const isAgentMsg = !c.incoming || (agentIds?.has(c.user_id));
+    if (!isAgentMsg) continue;
     const d = new Date(c.created_at);
     if (d < start || d > end) continue;
     agentConvs.push({
@@ -128,7 +131,7 @@ export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDate
 
 // Auditoria de horas: tickets com interação de agente no período sem horas lançadas
 // Retorna { missing: [...], ticketDetails: { [id]: { convs, timeDays } } }
-export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, onProgress) {
+export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, onProgress, agentIds) {
   const start = new Date(startDateStr + 'T00:00:00');
   const end   = new Date(endDateStr   + 'T23:59:59');
 
@@ -188,7 +191,9 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
         const agentDays  = {}; // dateStr → agentId (para detectar lacunas)
 
         for (const c of convs) {
-          if (c.incoming) continue; // ignora mensagens do cliente
+          // Interação de agente: incoming=false OU user_id é agente conhecido (e-mail externo)
+          const isAgentMsg = !c.incoming || (agentIds?.has(c.user_id));
+          if (!isAgentMsg) continue;
           const d = new Date(c.created_at);
           if (d < start || d > end) continue;
           const dateStr = c.created_at.split('T')[0];

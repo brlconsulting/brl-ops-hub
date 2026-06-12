@@ -105,6 +105,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
   const [singleError,  setSingleError]  = useState('');
 
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
+  const agentIds = new Set(agents.map(a => a.id));
 
   const isSingleMode = ticketFilter.trim() !== '';
 
@@ -120,7 +121,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
       const id = ticketFilter.trim().replace('#', '');
       setProgress(`Buscando chamado #${id}…`);
       try {
-        const data = await fetchSingleTicketAudit(domain, apiKey, id, startDate, endDate);
+        const data = await fetchSingleTicketAudit(domain, apiKey, id, startDate, endDate, agentIds);
         setSingleResult(data);
       } catch (e) {
         setSingleError(`Não foi possível carregar o chamado #${id}: ${e.message}`);
@@ -129,7 +130,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
       // Auditoria completa
       setProgress('Iniciando…');
       try {
-        const data = await fetchTimeAudit(domain, apiKey, startDate, endDate, setProgress);
+        const data = await fetchTimeAudit(domain, apiKey, startDate, endDate, setProgress, agentIds);
         setResults(data);
       } catch (e) {
         setProgress('Erro: ' + e.message);
