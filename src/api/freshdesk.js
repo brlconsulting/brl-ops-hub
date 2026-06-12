@@ -89,6 +89,7 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
 }
 
 // Auditoria de horas: tickets com interação de agente no período sem horas lançadas
+// Retorna { missing: [...], ticketDetails: { [id]: { convs, timeDays } } }
 export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, onProgress) {
   const start = new Date(startDateStr + 'T00:00:00');
   const end   = new Date(endDateStr   + 'T23:59:59');
@@ -128,30 +129,46 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
       include: 'requester',
     });
     for (const t of batch) {
-      const u = new Date(t.updated_at);
-      if (u <= end) updatedTickets.push(t);
+      if (new Date(t.updated_at) <= end) updatedTickets.push(t);
     }
     if (batch.length < 100) break;
     page++;
   }
 
-  // 3. Conversas por ticket em lotes de 5 (evitar rate limit)
+  // 3. Conversas por ticket em lotes de 5
   const missing = [];
+  const ticketDetails = {}; // { [ticketId]: { convs: [...], timeDays: {...} } }
   const BATCH = 5;
+
   for (let i = 0; i < updatedTickets.length; i += BATCH) {
     onProgress?.(`Verificando conversas: ${Math.min(i + BATCH, updatedTickets.length)} / ${updatedTickets.length} tickets…`);
     const slice = updatedTickets.slice(i, i + BATCH);
     await Promise.all(slice.map(async ticket => {
       try {
         const convs = await apiGet(domain, apiKey, `/tickets/${ticket.id}/conversations`, { per_page: 100 });
-        // agentDays[dateStr] = último agentId que interagiu naquele dia
-        const agentDays = {};
+        const agentConvs = [];
+        const agentDays  = {}; // dateStr → agentId (para detectar lacunas)
+
         for (const c of convs) {
           if (c.incoming) continue; // ignora mensagens do cliente
           const d = new Date(c.created_at);
           if (d < start || d > end) continue;
-          agentDays[c.created_at.split('T')[0]] = c.user_id;
+          const dateStr = c.created_at.split('T')[0];
+          agentDays[dateStr] = c.user_id;
+          agentConvs.push({
+            dateStr,
+            agentId: c.user_id,
+            snippet: (c.body_text || '').replace(/\s+/g, ' ').trim().slice(0, 140) || '(sem texto)',
+          });
         }
+
+        if (agentConvs.length > 0) {
+          ticketDetails[ticket.id] = {
+            convs:    agentConvs.sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
+            timeDays: timeMap[ticket.id] || {},
+          };
+        }
+
         for (const [day, agentId] of Object.entries(agentDays)) {
           if (!timeMap[ticket.id]?.[day]) {
             missing.push({ ticket, day, agentId });
@@ -161,7 +178,10 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
     }));
   }
 
-  return missing.sort((a, b) => b.day.localeCompare(a.day));
+  return {
+    missing: missing.sort((a, b) => b.day.localeCompare(a.day)),
+    ticketDetails,
+  };
 }
 
 // Retorna { year, month } do mês a exibir:
