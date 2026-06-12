@@ -13,6 +13,7 @@ import ScheduledPanel from './components/ScheduledPanel';
 import TimeMatrixPanel from './components/TimeMatrixPanel';
 import OpenByCustomerPanel from './components/OpenByCustomerPanel';
 import SettingsModal from './components/SettingsModal';
+import TimeAuditModal from './components/TimeAuditModal';
 import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime, fetchMonthlyTimeEntries } from './api/freshdesk';
 
 const PROJETOS_GROUP_ID = 22000159334;
@@ -35,6 +36,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAudit,    setShowAudit]    = useState(false);
 
   const refresh = useCallback(async () => {
     if (!config.apiKey) return;
@@ -90,8 +92,18 @@ export default function App() {
         loading={loading}
         lastUpdated={lastUpdated}
         onRefresh={refresh}
+        onAudit={() => setShowAudit(true)}
         onSettings={() => setShowSettings(true)}
       />
+
+      {showAudit && (
+        <TimeAuditModal
+          domain={config.domain}
+          apiKey={config.apiKey}
+          agents={agents}
+          onClose={() => setShowAudit(false)}
+        />
+      )}
 
       {showSettings && (
         <SettingsModal

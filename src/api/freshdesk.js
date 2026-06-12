@@ -88,6 +88,82 @@ export async function fetchProjectTickets(domain, apiKey, groupId) {
   }));
 }
 
+// Auditoria de horas: tickets com interação de agente no período sem horas lançadas
+export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, onProgress) {
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end   = new Date(endDateStr   + 'T23:59:59');
+
+  // 1. Registros de horas no período
+  onProgress?.('Buscando registros de horas…');
+  const allTimeEntries = [];
+  let page = 1;
+  while (page <= 30) {
+    const batch = await apiGet(domain, apiKey, '/time_entries', { per_page: 100, page });
+    if (!batch.length) break;
+    for (const e of batch) {
+      if (!e.executed_at) continue;
+      const d = new Date(e.executed_at.split('T')[0] + 'T12:00:00');
+      if (d >= start && d <= end) allTimeEntries.push(e);
+    }
+    if (batch.length < 100) break;
+    page++;
+  }
+  // timeMap[ticketId][dateStr] = true
+  const timeMap = {};
+  for (const e of allTimeEntries) {
+    const dateStr = e.executed_at.split('T')[0];
+    if (!timeMap[e.ticket_id]) timeMap[e.ticket_id] = {};
+    timeMap[e.ticket_id][dateStr] = true;
+  }
+
+  // 2. Tickets atualizados no período
+  onProgress?.('Buscando tickets atualizados no período…');
+  const updatedTickets = [];
+  page = 1;
+  while (true) {
+    const batch = await apiGet(domain, apiKey, '/tickets', {
+      per_page: 100,
+      page,
+      updated_since: startDateStr,
+      include: 'requester',
+    });
+    for (const t of batch) {
+      const u = new Date(t.updated_at);
+      if (u <= end) updatedTickets.push(t);
+    }
+    if (batch.length < 100) break;
+    page++;
+  }
+
+  // 3. Conversas por ticket em lotes de 5 (evitar rate limit)
+  const missing = [];
+  const BATCH = 5;
+  for (let i = 0; i < updatedTickets.length; i += BATCH) {
+    onProgress?.(`Verificando conversas: ${Math.min(i + BATCH, updatedTickets.length)} / ${updatedTickets.length} tickets…`);
+    const slice = updatedTickets.slice(i, i + BATCH);
+    await Promise.all(slice.map(async ticket => {
+      try {
+        const convs = await apiGet(domain, apiKey, `/tickets/${ticket.id}/conversations`, { per_page: 100 });
+        // agentDays[dateStr] = último agentId que interagiu naquele dia
+        const agentDays = {};
+        for (const c of convs) {
+          if (c.incoming) continue; // ignora mensagens do cliente
+          const d = new Date(c.created_at);
+          if (d < start || d > end) continue;
+          agentDays[c.created_at.split('T')[0]] = c.user_id;
+        }
+        for (const [day, agentId] of Object.entries(agentDays)) {
+          if (!timeMap[ticket.id]?.[day]) {
+            missing.push({ ticket, day, agentId });
+          }
+        }
+      } catch { /* ignora erros individuais */ }
+    }));
+  }
+
+  return missing.sort((a, b) => b.day.localeCompare(a.day));
+}
+
 // Retorna { year, month } do mês a exibir:
 // até dia 10 → mês anterior; após dia 10 → mês atual
 export function getDisplayMonth() {

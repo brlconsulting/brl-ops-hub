@@ -1,4 +1,4 @@
-export default function Header({ loading, lastUpdated, onRefresh, onSettings }) {
+export default function Header({ loading, lastUpdated, onRefresh, onSettings, onAudit }) {
   return (
     <header className="bg-blue-900 text-white shadow-lg">
       <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -13,6 +13,18 @@ export default function Header({ loading, lastUpdated, onRefresh, onSettings }) 
               Atualizado: {lastUpdated.toLocaleTimeString('pt-BR')}
             </span>
           )}
+
+          <button
+            onClick={onAudit}
+            className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded text-sm transition-colors"
+            title="Rastrear horas não lançadas"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Rastrear Horas
+          </button>
 
           <button
             onClick={onRefresh}
