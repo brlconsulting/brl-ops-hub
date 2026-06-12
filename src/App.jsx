@@ -11,6 +11,7 @@ import ThomsonPanel from './components/ThomsonPanel';
 import NoTimePanel from './components/NoTimePanel';
 import ScheduledPanel from './components/ScheduledPanel';
 import TimeMatrixPanel from './components/TimeMatrixPanel';
+import OpenByCustomerPanel from './components/OpenByCustomerPanel';
 import SettingsModal from './components/SettingsModal';
 import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime, fetchMonthlyTimeEntries } from './api/freshdesk';
 
@@ -147,7 +148,10 @@ export default function App() {
           {/* 8 — Atividade Agendada */}
           <ScheduledPanel tickets={tickets} agents={agents} domain={config.domain} />
 
-          {/* 9 — Horas por Consultor */}
+          {/* 9 — Tickets abertos por cliente (tabela) */}
+          <OpenByCustomerPanel tickets={tickets} agents={agents} domain={config.domain} />
+
+          {/* 10 — Horas por Consultor */}
           <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} />
 
         </main>
