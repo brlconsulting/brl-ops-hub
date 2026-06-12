@@ -28,7 +28,7 @@ export async function fetchAllOpenTickets(domain, apiKey) {
     const batch = await apiGet(domain, apiKey, '/tickets', {
       per_page: 100,
       page,
-      include: 'requester',
+      include: 'requester,company',
     });
     results.push(...batch.filter((t) => t.status !== 4 && t.status !== 5));
     if (batch.length < 100) break;

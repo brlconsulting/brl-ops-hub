@@ -42,8 +42,9 @@ export function groupByAgent(tickets, agents) {
 export function groupByCustomer(tickets) {
   const groups = {};
   for (const t of tickets) {
-    const id = t.requester_id;
-    const name = t.requester?.name || t.requester?.email || `Cliente ${id}`;
+    // Agrupa por empresa; se não tiver empresa, usa o contato como fallback
+    const id   = t.company_id ? `co_${t.company_id}` : `req_${t.requester_id}`;
+    const name = t.company?.name || t.requester?.name || t.requester?.email || `Cliente ${t.requester_id}`;
     if (!groups[id]) groups[id] = { id, name, tickets: [] };
     groups[id].tickets.push(t);
   }
