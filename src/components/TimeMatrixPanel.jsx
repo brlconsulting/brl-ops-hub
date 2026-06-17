@@ -94,10 +94,10 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
           <select
             value={filterAgent}
             onChange={e => setFilterAgent(e.target.value)}
-            className="ml-auto text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600
-                       focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+            className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-gray-50 text-gray-700
+                       focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer font-medium"
           >
-            <option value="">Todos os consultores</option>
+            <option value="">👥 Todos os consultores</option>
             {activeIds.map(id => (
               <option key={id} value={id}>
                 {agentMap.get(id) || `Agente ${id}`}
@@ -107,8 +107,7 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
         )}
 
         {!loading && grandTotal > 0 && (
-          <span className={`text-xs font-normal bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full ${filterAgent ? '' : 'ml-auto'}`}
-            style={filterAgent ? {} : {}}>
+          <span className="ml-auto text-xs font-normal bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
             {toHHMM(grandTotal)} {filterAgent ? 'registradas' : 'total'}
           </span>
         )}
