@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { getDisplayMonth } from '../api/freshdesk';
 
 // Converte "HH:MM" → minutos
@@ -20,6 +21,7 @@ function dayOf(isoStr) {
 }
 
 export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
+  const [filterAgent, setFilterAgent] = useState('');
   const now = new Date();
   const { year, month } = getDisplayMonth(); // month é 1-indexed
 
@@ -59,30 +61,64 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
     .map(Number)
     .sort((a, b) => (agentMap.get(a) || '').localeCompare(agentMap.get(b) || ''));
 
-  const grandTotal = Object.values(agentTotals).reduce((s, v) => s + v, 0);
+  // Filtro por consultor
+  const visibleIds = filterAgent
+    ? activeIds.filter(id => id === Number(filterAgent))
+    : activeIds;
+
+  // Totais por dia e geral (apenas dos consultores visíveis)
+  const visibleDayTotals = {};
+  let grandTotal = 0;
+  for (const agentId of visibleIds) {
+    grandTotal += agentTotals[agentId] || 0;
+    for (const [day, mins] of Object.entries(matrix[agentId] || {})) {
+      visibleDayTotals[day] = (visibleDayTotals[day] || 0) + mins;
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-5">
 
       {/* header */}
-      <h2 className="text-base font-bold text-gray-700 mb-4 flex items-center gap-2">
-        <span>🕐</span> Horas por Consultor
-        <span className="text-xs font-normal text-gray-400 ml-0.5 capitalize">{monthLabel}</span>
-        {loading && (
-          <span className="ml-2 text-xs text-blue-400 animate-pulse">carregando…</span>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <h2 className="text-base font-bold text-gray-700 flex items-center gap-2">
+          <span>🕐</span> Horas por Consultor
+          <span className="text-xs font-normal text-gray-400 capitalize">{monthLabel}</span>
+          {loading && (
+            <span className="ml-1 text-xs text-blue-400 animate-pulse">carregando…</span>
+          )}
+        </h2>
+
+        {/* filtro por consultor */}
+        {!loading && activeIds.length > 0 && (
+          <select
+            value={filterAgent}
+            onChange={e => setFilterAgent(e.target.value)}
+            className="ml-auto text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600
+                       focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+          >
+            <option value="">Todos os consultores</option>
+            {activeIds.map(id => (
+              <option key={id} value={id}>
+                {agentMap.get(id) || `Agente ${id}`}
+              </option>
+            ))}
+          </select>
         )}
+
         {!loading && grandTotal > 0 && (
-          <span className="ml-auto text-xs font-normal bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-            {toHHMM(grandTotal)} total
+          <span className={`text-xs font-normal bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full ${filterAgent ? '' : 'ml-auto'}`}
+            style={filterAgent ? {} : {}}>
+            {toHHMM(grandTotal)} {filterAgent ? 'registradas' : 'total'}
           </span>
         )}
-      </h2>
+      </div>
 
       {loading ? (
         <p className="text-sm text-gray-400 text-center py-10 animate-pulse">
           Carregando horas registradas…
         </p>
-      ) : activeIds.length === 0 ? (
+      ) : visibleIds.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-10">
           Nenhuma hora registrada neste mês
         </p>
@@ -113,7 +149,7 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
 
             {/* ── linhas por agente ── */}
             <tbody>
-              {activeIds.map((agentId, rowIdx) => {
+              {visibleIds.map((agentId, rowIdx) => {
                 const agentDays = matrix[agentId] || {};
                 const total     = agentTotals[agentId] || 0;
                 return (
@@ -160,7 +196,7 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
                   <td key={d}
                     className={`py-2.5 px-1 text-center text-gray-600
                       ${d === today ? 'bg-blue-100 text-blue-700' : ''}`}>
-                    {dayTotals[d] ? toHHMM(dayTotals[d]) : '—'}
+                    {visibleDayTotals[d] ? toHHMM(visibleDayTotals[d]) : '—'}
                   </td>
                 ))}
                 <td className="py-2.5 px-3 text-center font-bold text-gray-900
