@@ -41,7 +41,7 @@ function FilterChip({ active, onToggle, label, activeColor }) {
   );
 }
 
-export default function TicketsByAgent({ tickets, agents, domain }) {
+export default function TicketsByAgent({ tickets, agents, domain, onTicketClick }) {
   // status 3 = Ag. Resposta  |  status 6 = Ag. Cliente
   // ambos significam "aguardando ação do cliente" — um único toggle
   const [hideAgCliente, setHideAgCliente] = useState(true);
@@ -92,7 +92,7 @@ export default function TicketsByAgent({ tickets, agents, domain }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {groups.map((g) => (
-            <GroupCard key={g.id} group={g} domain={domain} />
+            <GroupCard key={g.id} group={g} domain={domain} onTicketClick={onTicketClick} />
           ))}
         </div>
       )}

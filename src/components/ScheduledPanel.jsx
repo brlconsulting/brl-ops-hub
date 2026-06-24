@@ -5,7 +5,25 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export default function ScheduledPanel({ tickets, agents, domain }) {
+function FdBtn({ domain, id }) {
+  return (
+    <a
+      href={ticketUrl(domain, id)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      title="Abrir no FreshDesk"
+      className="inline-flex text-gray-300 hover:text-blue-500 transition-colors"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </a>
+  );
+}
+
+export default function ScheduledPanel({ tickets, agents, domain, onTicketClick }) {
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
 
   const items = tickets
@@ -15,7 +33,6 @@ export default function ScheduledPanel({ tickets, agents, domain }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-5">
 
-      {/* header */}
       <h2 className="text-base font-bold text-gray-700 mb-4 flex items-center gap-2">
         <span>📅</span> Atividade Agendada
         <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full
@@ -41,6 +58,7 @@ export default function ScheduledPanel({ tickets, agents, domain }) {
                 <th className="text-left py-1.5 px-2">Prioridade</th>
                 <th className="text-left py-1.5 px-2">Prazo</th>
                 <th className="text-left py-1.5 px-2">Criado</th>
+                <th className="py-1.5 px-2 w-6"></th>
               </tr>
             </thead>
             <tbody>
@@ -49,18 +67,11 @@ export default function ScheduledPanel({ tickets, agents, domain }) {
                 const isOverdue = t.due_by && new Date(t.due_by) < new Date();
                 return (
                   <tr key={t.id}
-                    className={`border-b border-gray-50 hover:bg-orange-50/40 transition-colors ${isOverdue ? 'bg-red-50/30' : ''}`}>
-                    <td className="py-2 px-2">
-                      <a href={ticketUrl(domain, t.id)} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-gray-400 font-mono hover:text-blue-600">
-                        #{t.id}
-                      </a>
-                    </td>
+                    className={`border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer ${isOverdue ? 'bg-red-50/30' : ''}`}
+                    onClick={() => onTicketClick?.(t)}>
+                    <td className="py-2 px-2 text-xs text-gray-400 font-mono">#{t.id}</td>
                     <td className="py-2 px-2 max-w-[280px]">
-                      <a href={ticketUrl(domain, t.id)} target="_blank" rel="noopener noreferrer"
-                        className="text-gray-800 font-medium hover:text-blue-600 truncate block">
-                        {t.subject}
-                      </a>
+                      <span className="text-gray-800 font-medium truncate block">{t.subject}</span>
                     </td>
                     <td className="py-2 px-2 text-xs text-gray-500 truncate max-w-[140px]">
                       {t.requester?.name || '—'}
@@ -79,6 +90,9 @@ export default function ScheduledPanel({ tickets, agents, domain }) {
                     </td>
                     <td className="py-2 px-2 text-xs text-gray-500 whitespace-nowrap">
                       {formatDate(t.created_at)}
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      <FdBtn domain={domain} id={t.id} />
                     </td>
                   </tr>
                 );

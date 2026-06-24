@@ -1,26 +1,39 @@
 import { useState } from 'react';
 import { volumeColor, PRIORITY_COLORS, PRIORITY_NAMES, ticketUrl } from '../utils/helpers';
 
-function TicketRow({ ticket, domain }) {
+function TicketRow({ ticket, domain, onTicketClick }) {
   return (
-    <a
-      href={ticketUrl(domain, ticket.id)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start justify-between gap-2 px-3 py-2 hover:bg-gray-50 rounded text-sm border-b border-gray-100 last:border-0"
+    <div
+      onClick={() => onTicketClick?.(ticket)}
+      className="flex items-start justify-between gap-2 px-3 py-2 hover:bg-gray-50 rounded text-sm border-b border-gray-100 last:border-0 cursor-pointer"
     >
       <div className="flex items-start gap-2 min-w-0">
         <span className="text-gray-400 text-xs mt-0.5 shrink-0">#{ticket.id}</span>
         <span className="text-gray-700 truncate">{ticket.subject}</span>
       </div>
-      <span className={`shrink-0 text-xs ${PRIORITY_COLORS[ticket.priority]}`}>
-        {PRIORITY_NAMES[ticket.priority] || '—'}
-      </span>
-    </a>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={`text-xs ${PRIORITY_COLORS[ticket.priority]}`}>
+          {PRIORITY_NAMES[ticket.priority] || '—'}
+        </span>
+        <a
+          href={ticketUrl(domain, ticket.id)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          title="Abrir no FreshDesk"
+          className="text-gray-300 hover:text-blue-500 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+    </div>
   );
 }
 
-export default function GroupCard({ group, domain }) {
+export default function GroupCard({ group, domain, onTicketClick }) {
   const [expanded, setExpanded] = useState(false);
   const count = group.tickets.length;
   const colors = volumeColor(count);
@@ -48,7 +61,7 @@ export default function GroupCard({ group, domain }) {
 
       <div className="bg-white px-1 py-1">
         {visible.map((t) => (
-          <TicketRow key={t.id} ticket={t} domain={domain} />
+          <TicketRow key={t.id} ticket={t} domain={domain} onTicketClick={onTicketClick} />
         ))}
         {!expanded && count > 5 && (
           <button

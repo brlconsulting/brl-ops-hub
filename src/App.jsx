@@ -14,6 +14,7 @@ import TimeMatrixPanel from './components/TimeMatrixPanel';
 import OpenByCustomerPanel from './components/OpenByCustomerPanel';
 import SettingsModal from './components/SettingsModal';
 import TimeAuditModal from './components/TimeAuditModal';
+import TicketDetailDrawer from './components/TicketDetailDrawer';
 import { fetchAllOpenTickets, fetchAgents, fetchProjectTickets, fetchTicketsWithoutTime, fetchMonthlyTimeEntries } from './api/freshdesk';
 
 const PROJETOS_GROUP_ID = 22000159334;
@@ -35,8 +36,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAudit,    setShowAudit]    = useState(false);
+  const [showSettings,    setShowSettings]    = useState(false);
+  const [showAudit,       setShowAudit]       = useState(false);
+  const [selectedTicket,  setSelectedTicket]  = useState(null);
 
   const refresh = useCallback(async () => {
     if (!config.apiKey) return;
@@ -105,6 +107,15 @@ export default function App() {
         />
       )}
 
+      {selectedTicket && (
+        <TicketDetailDrawer
+          ticket={selectedTicket}
+          domain={config.domain}
+          apiKey={config.apiKey}
+          onClose={() => setSelectedTicket(null)}
+        />
+      )}
+
       {showSettings && (
         <SettingsModal
           config={config}
@@ -135,33 +146,33 @@ export default function App() {
 
           {/* 2 — SLA violado | Urgentes + Thomson (empilhados) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <SLAPanel tickets={tickets} domain={config.domain} />
+            <SLAPanel tickets={tickets} domain={config.domain} onTicketClick={setSelectedTicket} />
             <div className="flex flex-col gap-5">
-              <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} />
-              <ThomsonPanel tickets={tickets} agents={agents} domain={config.domain} />
+              <UrgentPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
+              <ThomsonPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
             </div>
           </div>
 
           {/* 3 — Sem Horas Registradas */}
-          <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} agents={agents} domain={config.domain} />
+          <NoTimePanel tickets={noTimeTickets} loading={noTimeLoading} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 4 — Sem agente (faixa completa) */}
-          <UnassignedPanel tickets={tickets} domain={config.domain} />
+          <UnassignedPanel tickets={tickets} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 5 — Tickets por Agente */}
-          <TicketsByAgent tickets={tickets} agents={agents} domain={config.domain} />
+          <TicketsByAgent tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 6 — Tickets por Cliente */}
-          <TicketsByCustomer tickets={tickets} domain={config.domain} />
+          <TicketsByCustomer tickets={tickets} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 7 — Projetos */}
-          <ProjectsPanel tickets={projectTickets} agents={agents} domain={config.domain} />
+          <ProjectsPanel tickets={projectTickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 8 — Atividade Agendada */}
-          <ScheduledPanel tickets={tickets} agents={agents} domain={config.domain} />
+          <ScheduledPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 9 — Tickets abertos por cliente (tabela) */}
-          <OpenByCustomerPanel tickets={tickets} agents={agents} domain={config.domain} />
+          <OpenByCustomerPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 10 — Horas por Consultor */}
           <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} />

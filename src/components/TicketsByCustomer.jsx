@@ -25,7 +25,7 @@ function FilterChip({ active, onToggle, label, activeColor }) {
   );
 }
 
-export default function TicketsByCustomer({ tickets, domain }) {
+export default function TicketsByCustomer({ tickets, domain, onTicketClick }) {
   // quando ativo: mostra SOMENTE os tickets aguardando o cliente (status 3 ou 6)
   const [soAgCliente, setSoAgCliente] = useState(false);
 
@@ -68,7 +68,7 @@ export default function TicketsByCustomer({ tickets, domain }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {groups.map((g) => (
-            <GroupCard key={g.id} group={g} domain={domain} />
+            <GroupCard key={g.id} group={g} domain={domain} onTicketClick={onTicketClick} />
           ))}
         </div>
       )}

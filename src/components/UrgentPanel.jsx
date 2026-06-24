@@ -1,6 +1,24 @@
 import { ticketUrl, dueDateLabel } from '../utils/helpers';
 
-export default function UrgentPanel({ tickets, agents, domain }) {
+function FdBtn({ domain, id }) {
+  return (
+    <a
+      href={ticketUrl(domain, id)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      title="Abrir no FreshDesk"
+      className="inline-flex text-gray-300 hover:text-blue-500 transition-colors"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </a>
+  );
+}
+
+export default function UrgentPanel({ tickets, agents, domain, onTicketClick }) {
   const agentMap = new Map(agents.map((a) => [a.id, a.contact?.name || `Agente ${a.id}`]));
 
   const urgents = tickets
@@ -29,6 +47,7 @@ export default function UrgentPanel({ tickets, agents, domain }) {
                 <th className="text-left py-2 px-1">Cliente</th>
                 <th className="text-left py-2 px-1">Agente</th>
                 <th className="text-left py-2 px-1">SLA</th>
+                <th className="py-2 px-1 w-6"></th>
               </tr>
             </thead>
             <tbody>
@@ -38,27 +57,12 @@ export default function UrgentPanel({ tickets, agents, domain }) {
                 return (
                   <tr
                     key={t.id}
-                    className={`border-b border-gray-50 hover:bg-red-50 ${isOverdue ? 'bg-red-50/50' : ''}`}
+                    className={`border-b border-gray-50 hover:bg-red-50 cursor-pointer ${isOverdue ? 'bg-red-50/50' : ''}`}
+                    onClick={() => onTicketClick?.(t)}
                   >
-                    <td className="py-1.5 px-1 text-gray-400 text-xs">
-                      <a
-                        href={ticketUrl(domain, t.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-blue-600 font-mono"
-                      >
-                        #{t.id}
-                      </a>
-                    </td>
+                    <td className="py-1.5 px-1 text-gray-400 text-xs font-mono">#{t.id}</td>
                     <td className="py-1.5 px-1 max-w-[160px]">
-                      <a
-                        href={ticketUrl(domain, t.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-800 font-medium hover:text-blue-600 truncate block"
-                      >
-                        {t.subject}
-                      </a>
+                      <span className="text-gray-800 font-medium truncate block">{t.subject}</span>
                     </td>
                     <td className="py-1.5 px-1 text-gray-500 text-xs truncate max-w-[100px]">
                       {t.requester?.name || '—'}
@@ -71,6 +75,9 @@ export default function UrgentPanel({ tickets, agents, domain }) {
                     </td>
                     <td className={`py-1.5 px-1 text-xs whitespace-nowrap ${due.cls}`}>
                       {due.text}
+                    </td>
+                    <td className="py-1.5 px-1 text-right">
+                      <FdBtn domain={domain} id={t.id} />
                     </td>
                   </tr>
                 );

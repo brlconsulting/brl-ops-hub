@@ -1,13 +1,30 @@
 import { groupByCustomer, ticketUrl, PRIORITY_NAMES, PRIORITY_COLORS, STATUS_NAMES } from '../utils/helpers';
 
-export default function OpenByCustomerPanel({ tickets, agents, domain }) {
+function FdBtn({ domain, id }) {
+  return (
+    <a
+      href={ticketUrl(domain, id)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      title="Abrir no FreshDesk"
+      className="inline-flex text-gray-300 hover:text-blue-500 transition-colors"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </a>
+  );
+}
+
+export default function OpenByCustomerPanel({ tickets, agents, domain, onTicketClick }) {
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
   const groups   = groupByCustomer(tickets);
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-5">
 
-      {/* header */}
       <h2 className="text-base font-bold text-gray-700 mb-4 flex items-center gap-2">
         <span>🏢</span> Tickets Abertos por Cliente
         <span className="ml-auto text-xs font-normal bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
@@ -25,7 +42,6 @@ export default function OpenByCustomerPanel({ tickets, agents, domain }) {
           {groups.map(({ id, name, tickets: group }) => (
             <div key={id}>
 
-              {/* sub-header do cliente */}
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-sm font-semibold text-gray-700 truncate">{name}</span>
                 <span className="text-xs text-gray-400 shrink-0">
@@ -34,7 +50,6 @@ export default function OpenByCustomerPanel({ tickets, agents, domain }) {
                 <div className="flex-1 border-b border-gray-100" />
               </div>
 
-              {/* tabela */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-gray-400 uppercase border-b">
@@ -45,23 +60,17 @@ export default function OpenByCustomerPanel({ tickets, agents, domain }) {
                       <th className="text-left py-1.5 px-2">Agente</th>
                       <th className="text-left py-1.5 px-2">Usuário</th>
                       <th className="text-left py-1.5 px-2">Prioridade</th>
+                      <th className="py-1.5 px-2 w-6"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {group.map(t => (
                       <tr key={t.id}
-                        className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
-                        <td className="py-2 px-2">
-                          <a href={ticketUrl(domain, t.id)} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-gray-400 font-mono hover:text-blue-600">
-                            #{t.id}
-                          </a>
-                        </td>
+                        className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors cursor-pointer"
+                        onClick={() => onTicketClick?.(t)}>
+                        <td className="py-2 px-2 text-xs text-gray-400 font-mono">#{t.id}</td>
                         <td className="py-2 px-2 max-w-[300px]">
-                          <a href={ticketUrl(domain, t.id)} target="_blank" rel="noopener noreferrer"
-                            className="text-gray-800 font-medium hover:text-blue-600 truncate block">
-                            {t.subject}
-                          </a>
+                          <span className="text-gray-800 font-medium truncate block">{t.subject}</span>
                         </td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap text-gray-500">
                           {STATUS_NAMES[t.status] || `Status ${t.status}`}
@@ -77,6 +86,9 @@ export default function OpenByCustomerPanel({ tickets, agents, domain }) {
                         </td>
                         <td className={`py-2 px-2 text-xs whitespace-nowrap ${PRIORITY_COLORS[t.priority]}`}>
                           {PRIORITY_NAMES[t.priority] || '—'}
+                        </td>
+                        <td className="py-2 px-2 text-right">
+                          <FdBtn domain={domain} id={t.id} />
                         </td>
                       </tr>
                     ))}
