@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fetchTimeAudit, fetchSingleTicketAudit } from '../api/freshdesk';
+import { fetchTimeAudit, fetchSingleTicketAudit, createTimeEntry } from '../api/freshdesk';
 import { ticketUrl } from '../utils/helpers';
 
 function fmtDate(str) {
@@ -7,7 +7,11 @@ function fmtDate(str) {
   return `${d}/${m}/${y}`;
 }
 
-function ConvDetail({ details, agentMap }) {
+function ConvDetail({ details, agentMap, domain, apiKey, ticketId, responderId }) {
+  const [loggedDays, setLoggedDays] = useState({});
+  const [loadingDay, setLoadingDay]  = useState(null);
+  const [dayErrors,  setDayErrors]   = useState({});
+
   if (!details || details.convs.length === 0) return (
     <p className="text-xs text-gray-400 italic py-2 px-2">
       Nenhuma interação de agente encontrada no período.
@@ -15,6 +19,27 @@ function ConvDetail({ details, agentMap }) {
   );
 
   const { convs, timeDays } = details;
+
+  const logHours = async (conv) => {
+    const agentId = conv.agentId || responderId;
+    if (!agentId) {
+      setDayErrors(prev => ({ ...prev, [conv.dateStr]: 'Sem agente atribuído' }));
+      return;
+    }
+    setLoadingDay(conv.dateStr);
+    setDayErrors(prev => { const n = { ...prev }; delete n[conv.dateStr]; return n; });
+    try {
+      await createTimeEntry(
+        domain, apiKey, ticketId, agentId, conv.dateStr, '00:30',
+        conv.isSystem ? 'Notificação de atribuição' : 'Lançamento via BRL Ops Hub'
+      );
+      setLoggedDays(prev => ({ ...prev, [conv.dateStr]: true }));
+    } catch (e) {
+      setDayErrors(prev => ({ ...prev, [conv.dateStr]: 'Erro ao lançar' }));
+    } finally {
+      setLoadingDay(null);
+    }
+  };
 
   return (
     <table className="w-full text-xs mt-1">
@@ -28,22 +53,40 @@ function ConvDetail({ details, agentMap }) {
       </thead>
       <tbody>
         {convs.map((c, i) => {
-          const hasHours = !!timeDays[c.dateStr];
+          const isLogged  = loggedDays[c.dateStr] || !!timeDays[c.dateStr];
+          const isLoading = loadingDay === c.dateStr;
+          const err       = dayErrors[c.dateStr];
           return (
-            <tr key={i} className={`border-b border-gray-100 ${hasHours ? '' : 'bg-red-50/50'}`}>
+            <tr key={i} className={`border-b border-gray-100 ${isLogged ? '' : 'bg-red-50/50'}`}>
               <td className="py-1.5 px-2 whitespace-nowrap font-medium text-gray-600">
                 {fmtDate(c.dateStr)}
               </td>
               <td className="py-1.5 px-2 whitespace-nowrap text-gray-600">
+                {c.isSystem && (
+                  <span className="text-gray-400 text-[10px] mr-1 font-mono">SYS</span>
+                )}
                 {agentMap.get(c.agentId) || (c.agentId ? `Agente ${c.agentId}` : '—')}
               </td>
-              <td className="py-1.5 px-2 text-gray-500 max-w-[340px]">
+              <td className="py-1.5 px-2 text-gray-500 max-w-[320px]">
                 <span className="truncate block">{c.snippet}</span>
               </td>
-              <td className="py-1.5 px-2 whitespace-nowrap font-semibold">
-                {hasHours
-                  ? <span className="text-green-600">✅ Sim</span>
-                  : <span className="text-red-500">❌ Não</span>}
+              <td className="py-1.5 px-2 whitespace-nowrap">
+                {isLogged ? (
+                  <span className="text-green-600 font-semibold">✅ Sim</span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-500 font-semibold">❌ Não</span>
+                    <button
+                      onClick={() => logHours(c)}
+                      disabled={!!loadingDay}
+                      className="text-[10px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40
+                                 text-white px-2 py-0.5 rounded transition-colors whitespace-nowrap"
+                    >
+                      {isLoading ? '…' : 'Lançar 00:30'}
+                    </button>
+                    {err && <span className="text-red-400 text-[10px]">{err}</span>}
+                  </div>
+                )}
               </td>
             </tr>
           );
@@ -53,7 +96,7 @@ function ConvDetail({ details, agentMap }) {
   );
 }
 
-function TicketRow({ ticket, days, detail, agentMap, domain, defaultOpen }) {
+function TicketRow({ ticket, days, detail, agentMap, domain, apiKey, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
@@ -78,7 +121,14 @@ function TicketRow({ ticket, days, detail, agentMap, domain, defaultOpen }) {
           <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
             Interações no período
           </p>
-          <ConvDetail details={detail} agentMap={agentMap} />
+          <ConvDetail
+            details={detail}
+            agentMap={agentMap}
+            domain={domain}
+            apiKey={apiKey}
+            ticketId={ticket.id}
+            responderId={ticket.responder_id}
+          />
           <div className="mt-3">
             <a href={ticketUrl(domain, ticket.id)} target="_blank" rel="noopener noreferrer"
               className="text-xs text-blue-600 hover:underline">
@@ -101,7 +151,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
   const [loading,      setLoading]      = useState(false);
   const [progress,     setProgress]     = useState('');
   const [results,      setResults]      = useState(null);
-  const [singleResult, setSingleResult] = useState(null); // { ticket, detail, missingDays }
+  const [singleResult, setSingleResult] = useState(null);
   const [singleError,  setSingleError]  = useState('');
 
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
@@ -117,7 +167,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
     setProgress('');
 
     if (isSingleMode) {
-      // Busca chamado específico
       const id = ticketFilter.trim().replace('#', '');
       setProgress(`Buscando chamado #${id}…`);
       try {
@@ -127,7 +176,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
         setSingleError(`Não foi possível carregar o chamado #${id}: ${e.message}`);
       }
     } else {
-      // Auditoria completa
       setProgress('Iniciando…');
       try {
         const data = await fetchTimeAudit(domain, apiKey, startDate, endDate, setProgress, agentIds);
@@ -140,7 +188,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
     setLoading(false);
   };
 
-  // Agrupar resultados da auditoria completa por ticket
   const grouped = results ? (() => {
     const map = {};
     for (const r of results.missing) {
@@ -177,7 +224,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300" />
           </div>
 
-          {/* filtro por número de chamado */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">
               Nº do chamado <span className="text-gray-400 font-normal">(opcional)</span>
@@ -197,7 +243,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
             {loading ? 'Rastreando…' : isSingleMode ? `Verificar #${ticketFilter}` : 'Rastrear tudo'}
           </button>
 
-          {/* resumo auditoria completa */}
           {results && !loading && !isSingleMode && (
             <span className={`text-sm font-medium ${totalMissing === 0 ? 'text-green-600' : 'text-amber-600'}`}>
               {totalMissing === 0
@@ -217,7 +262,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
             </div>
           )}
 
-          {/* estado inicial */}
           {!loading && results === null && singleResult === null && !singleError && (
             <div className="text-center py-14 text-gray-400">
               <p className="text-3xl mb-3">🔎</p>
@@ -228,14 +272,12 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
             </div>
           )}
 
-          {/* erro no chamado específico */}
           {!loading && singleError && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {singleError}
             </div>
           )}
 
-          {/* resultado chamado específico */}
           {!loading && singleResult && (() => {
             const { ticket, detail, missingDays } = singleResult;
             return (
@@ -252,13 +294,13 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
                   detail={detail}
                   agentMap={agentMap}
                   domain={domain}
+                  apiKey={apiKey}
                   defaultOpen={true}
                 />
               </div>
             );
           })()}
 
-          {/* auditoria completa — sem lacunas */}
           {!loading && results !== null && totalMissing === 0 && (
             <div className="text-center py-14">
               <p className="text-4xl mb-3">✅</p>
@@ -267,7 +309,6 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
             </div>
           )}
 
-          {/* auditoria completa — com lacunas */}
           {!loading && grouped.length > 0 && (
             <div className="space-y-1">
               {grouped.map(({ ticket, days }) => (
@@ -278,6 +319,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
                   detail={results.ticketDetails[ticket.id]}
                   agentMap={agentMap}
                   domain={domain}
+                  apiKey={apiKey}
                   defaultOpen={false}
                 />
               ))}

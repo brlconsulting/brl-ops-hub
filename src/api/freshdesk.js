@@ -109,19 +109,25 @@ export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDate
   }
 
   // Conversas de agente no período
-  // Exclui mensagens automáticas (user_id nulo = sistema/automação)
-  // Interação de agente: incoming=false OU remetente não é o solicitante do ticket
+  // Inclui interações humanas E notificações de sistema com "notificado"
   const agentConvs = [];
   for (const c of convs) {
-    if (!c.user_id) continue; // automação/sistema sem remetente humano
-    const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
-    if (!isAgentMsg) continue;
+    let agentId;
+    if (!c.user_id) {
+      if (!(c.body_text || '').toLowerCase().includes('notificado')) continue;
+      agentId = ticket.responder_id; // atribui ao agente do chamado
+    } else {
+      const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
+      if (!isAgentMsg) continue;
+      agentId = c.user_id;
+    }
     const d = new Date(c.created_at);
     if (d < start || d > end) continue;
     agentConvs.push({
       dateStr: c.created_at.split('T')[0],
-      agentId: c.user_id,
+      agentId,
       snippet: (c.body_text || '').replace(/\s+/g, ' ').trim().slice(0, 140) || '(sem texto)',
+      isSystem: !c.user_id,
     });
   }
   agentConvs.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
@@ -193,17 +199,24 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
         const agentDays  = {}; // dateStr → agentId (para detectar lacunas)
 
         for (const c of convs) {
-          if (!c.user_id) continue; // automação/sistema sem remetente humano
-          const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
-          if (!isAgentMsg) continue;
+          let agentId;
+          if (!c.user_id) {
+            if (!(c.body_text || '').toLowerCase().includes('notificado')) continue;
+            agentId = ticket.responder_id;
+          } else {
+            const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
+            if (!isAgentMsg) continue;
+            agentId = c.user_id;
+          }
           const d = new Date(c.created_at);
           if (d < start || d > end) continue;
           const dateStr = c.created_at.split('T')[0];
-          agentDays[dateStr] = c.user_id;
+          agentDays[dateStr] = agentId;
           agentConvs.push({
             dateStr,
-            agentId: c.user_id,
+            agentId,
             snippet: (c.body_text || '').replace(/\s+/g, ' ').trim().slice(0, 140) || '(sem texto)',
+            isSystem: !c.user_id,
           });
         }
 
@@ -290,4 +303,28 @@ export async function fetchTicketsWithoutTime(domain, apiKey, tickets, days = 30
   );
 
   return results.filter(Boolean);
+}
+
+// Cria um registro de hora em um chamado
+export async function createTimeEntry(domain, apiKey, ticketId, agentId, dateStr, timeSpent = '00:30', note = '') {
+  const url = `https://${domain}.freshdesk.com/api/v2/tickets/${ticketId}/time_entries`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${btoa(`${apiKey}:X`)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      time_spent: timeSpent,
+      executed_at: `${dateStr}T12:00:00Z`,
+      agent_id: agentId,
+      billable: false,
+      note: note || 'Lançamento via BRL Ops Hub',
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`FreshDesk ${res.status}: ${text}`);
+  }
+  return res.json();
 }
