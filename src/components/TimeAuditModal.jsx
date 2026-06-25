@@ -7,7 +7,7 @@ function fmtDate(str) {
   return `${d}/${m}/${y}`;
 }
 
-function ConvDetail({ details, agentMap, domain, apiKey, ticketId, responderId }) {
+function ConvDetail({ details, agentMap, domain, apiKey, ticketId, responderId, batchLaunched }) {
   const [loggedDays, setLoggedDays] = useState({});
   const [loadingDay, setLoadingDay]  = useState(null);
   const [dayErrors,  setDayErrors]   = useState({});
@@ -53,7 +53,8 @@ function ConvDetail({ details, agentMap, domain, apiKey, ticketId, responderId }
       </thead>
       <tbody>
         {convs.map((c, i) => {
-          const isLogged  = loggedDays[c.dateStr] || !!timeDays[c.dateStr];
+          const batchKey = `${ticketId}:${c.dateStr}`;
+          const isLogged  = batchLaunched?.has(batchKey) || loggedDays[c.dateStr] || !!timeDays[c.dateStr];
           const isLoading = loadingDay === c.dateStr;
           const err       = dayErrors[c.dateStr];
           return (
@@ -96,7 +97,7 @@ function ConvDetail({ details, agentMap, domain, apiKey, ticketId, responderId }
   );
 }
 
-function TicketRow({ ticket, days, detail, agentMap, domain, apiKey, defaultOpen }) {
+function TicketRow({ ticket, days, detail, agentMap, domain, apiKey, defaultOpen, batchLaunched }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
@@ -128,6 +129,7 @@ function TicketRow({ ticket, days, detail, agentMap, domain, apiKey, defaultOpen
             apiKey={apiKey}
             ticketId={ticket.id}
             responderId={ticket.responder_id}
+            batchLaunched={batchLaunched}
           />
           <div className="mt-3">
             <a href={ticketUrl(domain, ticket.id)} target="_blank" rel="noopener noreferrer"
@@ -145,14 +147,17 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
   const today        = new Date().toISOString().split('T')[0];
   const firstOfMonth = today.slice(0, 7) + '-01';
 
-  const [startDate,    setStartDate]    = useState(firstOfMonth);
-  const [endDate,      setEndDate]      = useState(today);
-  const [ticketFilter, setTicketFilter] = useState('');
-  const [loading,      setLoading]      = useState(false);
-  const [progress,     setProgress]     = useState('');
-  const [results,      setResults]      = useState(null);
-  const [singleResult, setSingleResult] = useState(null);
-  const [singleError,  setSingleError]  = useState('');
+  const [startDate,     setStartDate]     = useState(firstOfMonth);
+  const [endDate,       setEndDate]       = useState(today);
+  const [ticketFilter,  setTicketFilter]  = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [progress,      setProgress]      = useState('');
+  const [results,       setResults]       = useState(null);
+  const [singleResult,  setSingleResult]  = useState(null);
+  const [singleError,   setSingleError]   = useState('');
+  const [batchLaunching, setBatchLaunching] = useState(false);
+  const [batchProgress,  setBatchProgress]  = useState('');
+  const [batchLaunched,  setBatchLaunched]  = useState(new Set()); // Set<"ticketId:dateStr">
 
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
   // Usa contact.id (não o agent id) — é o que aparece em conversations.user_id
@@ -160,12 +165,57 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
 
   const isSingleMode = ticketFilter.trim() !== '';
 
+  // Coleta todos os pares (ticketId, day, agentId) ainda pendentes
+  const getPendingEntries = () => {
+    const entries = [];
+    if (singleResult) {
+      const { ticket, missingDays, detail } = singleResult;
+      for (const day of missingDays) {
+        const key = `${ticket.id}:${day}`;
+        if (batchLaunched.has(key)) continue;
+        const conv = detail?.convs.find(c => c.dateStr === day);
+        entries.push({ ticketId: ticket.id, agentId: conv?.agentId || ticket.responder_id, day, isSystem: conv?.isSystem });
+      }
+    } else if (results) {
+      for (const r of results.missing) {
+        const key = `${r.ticket.id}:${r.day}`;
+        if (batchLaunched.has(key)) continue;
+        entries.push({ ticketId: r.ticket.id, agentId: r.agentId, day: r.day, isSystem: false });
+      }
+    }
+    return entries;
+  };
+
+  const launchAll = async () => {
+    const entries = getPendingEntries();
+    if (!entries.length) return;
+    setBatchLaunching(true);
+    const launched = new Set(batchLaunched);
+
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      setBatchProgress(`Lançando ${i + 1} de ${entries.length}…`);
+      try {
+        await createTimeEntry(
+          domain, apiKey, e.ticketId, e.agentId, e.day, '00:30',
+          e.isSystem ? 'Notificação de atribuição' : 'Lançamento via BRL Ops Hub'
+        );
+        launched.add(`${e.ticketId}:${e.day}`);
+      } catch { /* continua mesmo com falha individual */ }
+      setBatchLaunched(new Set(launched));
+    }
+
+    setBatchLaunching(false);
+    setBatchProgress('');
+  };
+
   const run = async () => {
     setLoading(true);
     setResults(null);
     setSingleResult(null);
     setSingleError('');
     setProgress('');
+    setBatchLaunched(new Set());
 
     if (isSingleMode) {
       const id = ticketFilter.trim().replace('#', '');
@@ -199,6 +249,8 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
   })() : [];
 
   const totalMissing = results?.missing.length ?? 0;
+
+  const pendingCount = (!loading && !batchLaunching) ? getPendingEntries().length : 0;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
@@ -239,10 +291,36 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
             />
           </div>
 
-          <button onClick={run} disabled={loading}
+          {/* botão rastrear */}
+          <button onClick={run} disabled={loading || batchLaunching}
             className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-1.5 rounded-lg transition-colors">
             {loading ? 'Rastreando…' : isSingleMode ? `Verificar #${ticketFilter}` : 'Rastrear tudo'}
           </button>
+
+          {/* botão lançar todos — aparece quando há pendentes */}
+          {pendingCount > 0 && (
+            <button
+              onClick={launchAll}
+              disabled={batchLaunching || loading}
+              className="flex items-center gap-2 bg-green-700 hover:bg-green-800 disabled:opacity-50
+                         text-white text-sm font-semibold px-5 py-1.5 rounded-lg transition-colors"
+            >
+              {batchLaunching ? (
+                <span>{batchProgress}</span>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Lançar todos
+                  <span className="bg-green-600 px-1.5 py-0.5 rounded-full text-xs font-bold">
+                    {pendingCount}
+                  </span>
+                </>
+              )}
+            </button>
+          )}
 
           {results && !loading && !isSingleMode && (
             <span className={`text-sm font-medium ${totalMissing === 0 ? 'text-green-600' : 'text-amber-600'}`}>
@@ -297,6 +375,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
                   domain={domain}
                   apiKey={apiKey}
                   defaultOpen={true}
+                  batchLaunched={batchLaunched}
                 />
               </div>
             );
@@ -322,6 +401,7 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
                   domain={domain}
                   apiKey={apiKey}
                   defaultOpen={false}
+                  batchLaunched={batchLaunched}
                 />
               ))}
             </div>
