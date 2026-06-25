@@ -117,7 +117,8 @@ export async function fetchSingleTicketAudit(domain, apiKey, ticketId, startDate
       if (!(c.body_text || '').toLowerCase().includes('notificado')) continue;
       agentId = ticket.responder_id; // atribui ao agente do chamado
     } else {
-      const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
+      // incoming=false → saiu do helpdesk (agente); incoming=true → só conta se for um agente conhecido
+      const isAgentMsg = !c.incoming || agentIds.has(c.user_id);
       if (!isAgentMsg) continue;
       agentId = c.user_id;
     }
@@ -204,7 +205,7 @@ export async function fetchTimeAudit(domain, apiKey, startDateStr, endDateStr, o
             if (!(c.body_text || '').toLowerCase().includes('notificado')) continue;
             agentId = ticket.responder_id;
           } else {
-            const isAgentMsg = !c.incoming || c.user_id !== ticket.requester_id;
+            const isAgentMsg = !c.incoming || agentIds.has(c.user_id);
             if (!isAgentMsg) continue;
             agentId = c.user_id;
           }

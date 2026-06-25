@@ -155,7 +155,8 @@ export default function TimeAuditModal({ domain, apiKey, agents, onClose }) {
   const [singleError,  setSingleError]  = useState('');
 
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
-  const agentIds = new Set(agents.map(a => a.id));
+  // Usa contact.id (não o agent id) — é o que aparece em conversations.user_id
+  const agentIds = new Set(agents.map(a => a.contact?.id).filter(Boolean));
 
   const isSingleMode = ticketFilter.trim() !== '';
 
