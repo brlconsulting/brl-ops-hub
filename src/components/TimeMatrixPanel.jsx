@@ -1,50 +1,64 @@
 import { useState } from 'react';
 import { getDisplayMonth } from '../api/freshdesk';
 
-// Converte "HH:MM" → minutos
 function toMins(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 
-// Minutos → "HH:MM"
 function toHHMM(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// Extrai o dia do mês da string ISO sem depender de timezone
 function dayOf(isoStr) {
   return isoStr ? parseInt(isoStr.split('T')[0].split('-')[2], 10) : null;
 }
 
-export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
-  const [filterAgent, setFilterAgent] = useState('');
+export default function TimeMatrixPanel({ timeEntries, agents, loading, tickets = [] }) {
+  const [filterAgent,   setFilterAgent]   = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+
   const now = new Date();
-  const { year, month } = getDisplayMonth(); // month é 1-indexed
+  const { year, month } = getDisplayMonth();
 
-  // "hoje" só faz sentido se estamos exibindo o mês atual
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-  const today       = isCurrentMonth ? now.getDate() : -1; // -1 = sem destaque
-  const currentDay  = now.getDate();
+  const today      = isCurrentMonth ? now.getDate() : -1;
+  const currentDay = now.getDate();
 
-  const daysInMonth = new Date(year, month, 0).getDate(); // last day of month
+  const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   const monthLabel = new Date(year, month - 1, 1)
     .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
-  // Mapa agentId → nome
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
+
+  // ticketId → company name (usando tickets abertos + projetos já carregados)
+  const ticketCompanyMap = new Map();
+  for (const t of tickets) {
+    const name = t.company?.name || t.requester?.name || null;
+    if (name) ticketCompanyMap.set(t.id, name);
+  }
+
+  // Lista de empresas que aparecem nas entradas do mês
+  const companiesInEntries = [...new Set(
+    timeEntries.map(e => ticketCompanyMap.get(e.ticket_id)).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  // Aplica filtro de empresa (antes de construir a matriz)
+  const visibleEntries = filterCompany
+    ? timeEntries.filter(e => ticketCompanyMap.get(e.ticket_id) === filterCompany)
+    : timeEntries;
 
   // Constrói a matriz: matrix[agentId][day] = minutos
   const matrix      = {};
   const agentTotals = {};
   const dayTotals   = {};
 
-  for (const entry of timeEntries) {
+  for (const entry of visibleEntries) {
     const agentId = entry.agent_id;
     const day     = dayOf(entry.executed_at);
     const mins    = toMins(entry.time_spent);
@@ -56,7 +70,6 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
     dayTotals[day]        = (dayTotals[day]         || 0) + mins;
   }
 
-  // Agentes com pelo menos uma entrada, ordenados por nome
   const activeIds = Object.keys(matrix)
     .map(Number)
     .sort((a, b) => (agentMap.get(a) || '').localeCompare(agentMap.get(b) || ''));
@@ -106,9 +119,24 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
           </select>
         )}
 
+        {/* filtro por cliente */}
+        {!loading && companiesInEntries.length > 0 && (
+          <select
+            value={filterCompany}
+            onChange={e => setFilterCompany(e.target.value)}
+            className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-gray-50 text-gray-700
+                       focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer font-medium"
+          >
+            <option value="">🏢 Todos os clientes</option>
+            {companiesInEntries.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        )}
+
         {!loading && grandTotal > 0 && (
           <span className="ml-auto text-xs font-normal bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-            {toHHMM(grandTotal)} {filterAgent ? 'registradas' : 'total'}
+            {toHHMM(grandTotal)} {filterAgent || filterCompany ? 'filtradas' : 'total'}
           </span>
         )}
       </div>
@@ -119,13 +147,12 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
         </p>
       ) : visibleIds.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-10">
-          Nenhuma hora registrada neste mês
+          {filterCompany ? `Nenhuma hora registrada para "${filterCompany}" neste mês` : 'Nenhuma hora registrada neste mês'}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-100">
           <table className="text-xs border-collapse" style={{ minWidth: `${140 + daysInMonth * 54 + 64}px` }}>
 
-            {/* ── cabeçalho de dias ── */}
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="sticky left-0 z-20 bg-gray-50 text-left py-2.5 px-3 font-semibold text-gray-600
@@ -146,7 +173,6 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
               </tr>
             </thead>
 
-            {/* ── linhas por agente ── */}
             <tbody>
               {visibleIds.map((agentId, rowIdx) => {
                 const agentDays = matrix[agentId] || {};
@@ -163,12 +189,11 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
                     {days.map(d => {
                       const mins    = agentDays[d] || 0;
                       const isToday = d === today;
-                      // Passado: mês anterior = todos os dias; mês atual = antes de hoje
                       const isPast  = !isCurrentMonth || d < currentDay;
-                      let cellCls = 'text-gray-300'; // futuro sem entrada
+                      let cellCls = 'text-gray-300';
                       if (isToday)       cellCls = mins > 0 ? 'text-blue-700 font-semibold' : 'text-blue-300';
                       else if (mins > 0) cellCls = 'text-gray-700';
-                      else if (isPast)   cellCls = 'text-red-300'; // dia passado sem horas
+                      else if (isPast)   cellCls = 'text-red-300';
                       return (
                         <td key={d}
                           className={`py-2.5 px-1 text-center whitespace-nowrap
@@ -177,15 +202,14 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading }) {
                         </td>
                       );
                     })}
-                    <td className={`py-2.5 px-3 text-center font-bold text-gray-800
-                                    border-l border-gray-200 bg-gray-50 sticky right-0 z-10`}>
+                    <td className="py-2.5 px-3 text-center font-bold text-gray-800
+                                   border-l border-gray-200 bg-gray-50 sticky right-0 z-10">
                       {toHHMM(total)}
                     </td>
                   </tr>
                 );
               })}
 
-              {/* ── linha de totais por dia ── */}
               <tr className="border-t-2 border-gray-300 bg-gray-100 font-semibold">
                 <td className="sticky left-0 z-10 bg-gray-100 py-2.5 px-3 text-gray-600
                                border-r border-gray-200">

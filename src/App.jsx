@@ -175,7 +175,7 @@ export default function App() {
           <OpenByCustomerPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 10 — Horas por Consultor */}
-          <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} />
+          <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} tickets={[...tickets, ...projectTickets]} />
 
         </main>
       )}
