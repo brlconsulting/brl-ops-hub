@@ -17,7 +17,7 @@ function dayOf(isoStr) {
   return isoStr ? parseInt(isoStr.split('T')[0].split('-')[2], 10) : null;
 }
 
-export default function TimeMatrixPanel({ timeEntries, agents, loading, tickets = [] }) {
+export default function TimeMatrixPanel({ timeEntries, agents, loading, ticketCompanyMap = new Map() }) {
   const [filterAgent,   setFilterAgent]   = useState('');
   const [filterCompany, setFilterCompany] = useState('');
 
@@ -35,13 +35,6 @@ export default function TimeMatrixPanel({ timeEntries, agents, loading, tickets 
     .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   const agentMap = new Map(agents.map(a => [a.id, a.contact?.name || `Agente ${a.id}`]));
-
-  // ticketId → company name (usando tickets abertos + projetos já carregados)
-  const ticketCompanyMap = new Map();
-  for (const t of tickets) {
-    const name = t.company?.name || t.requester?.name || null;
-    if (name) ticketCompanyMap.set(t.id, name);
-  }
 
   // Lista de empresas que aparecem nas entradas do mês
   const companiesInEntries = [...new Set(

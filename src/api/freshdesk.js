@@ -329,3 +329,32 @@ export async function createTimeEntry(domain, apiKey, ticketId, agentId, dateStr
   }
   return res.json();
 }
+
+// Builds a Map<ticketId, companyName> including tickets not currently open.
+// Fetches individual tickets for IDs in timeEntries that aren't in knownTickets.
+export async function enrichTimeEntriesWithCompany(domain, apiKey, timeEntries, knownTickets) {
+  const map = new Map();
+  for (const t of knownTickets) {
+    const name = t.company?.name || null;
+    if (name) map.set(t.id, name);
+  }
+
+  const unknownIds = [...new Set(
+    timeEntries.map(e => e.ticket_id).filter(id => !map.has(id))
+  )];
+
+  const BATCH = 10;
+  for (let i = 0; i < unknownIds.length; i += BATCH) {
+    await Promise.all(
+      unknownIds.slice(i, i + BATCH).map(async id => {
+        try {
+          const t = await apiGet(domain, apiKey, `/tickets/${id}`, { include: 'company' });
+          const name = t.company?.name || null;
+          if (name) map.set(id, name);
+        } catch { /* skip */ }
+      })
+    );
+  }
+
+  return map;
+}

@@ -32,6 +32,7 @@ export default function App() {
   const [noTimeTickets, setNoTimeTickets] = useState([]);
   const [noTimeLoading, setNoTimeLoading] = useState(false);
   const [timeEntries, setTimeEntries] = useState([]);
+  const [ticketCompanyMap, setTicketCompanyMap] = useState(new Map());
   const [timeMatrixLoading, setTimeMatrixLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -64,7 +65,11 @@ export default function App() {
 
       setTimeMatrixLoading(true);
       fetchMonthlyTimeEntries(config.domain, config.apiKey)
-        .then(te => setTimeEntries(te))
+        .then(async te => {
+          setTimeEntries(te);
+          const map = await enrichTimeEntriesWithCompany(config.domain, config.apiKey, te, [...t, ...p]);
+          setTicketCompanyMap(map);
+        })
         .catch(err => console.error('fetchMonthlyTimeEntries:', err))
         .finally(() => setTimeMatrixLoading(false));
 
@@ -175,7 +180,7 @@ export default function App() {
           <OpenByCustomerPanel tickets={tickets} agents={agents} domain={config.domain} onTicketClick={setSelectedTicket} />
 
           {/* 10 — Horas por Consultor */}
-          <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} tickets={[...tickets, ...projectTickets]} />
+          <TimeMatrixPanel timeEntries={timeEntries} agents={agents} loading={timeMatrixLoading} ticketCompanyMap={ticketCompanyMap} />
 
         </main>
       )}
