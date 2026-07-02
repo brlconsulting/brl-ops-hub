@@ -320,7 +320,7 @@ export async function createTimeEntry(domain, apiKey, ticketId, agentId, dateStr
       executed_at: `${dateStr}T12:00:00Z`,
       agent_id: agentId,
       billable: false,
-      note: note || 'Lançamento via BRL Ops Hub',
+      note: note || 'Análise Chamado',
     }),
   });
   if (!res.ok) {
