@@ -54,7 +54,7 @@ export default function UnassignedPanel({ tickets, domain, onTicketClick }) {
                     <span className="text-gray-700 truncate block">{t.subject}</span>
                   </td>
                   <td className="py-1.5 px-1 text-gray-500 text-xs truncate max-w-[120px]">
-                    {t.requester?.name || '—'}
+                    {t.company?.name || t.requester?.name || '—'}
                   </td>
                   <td className={`py-1.5 px-1 text-xs ${PRIORITY_COLORS[t.priority]}`}>
                     {PRIORITY_NAMES[t.priority] || '—'}
