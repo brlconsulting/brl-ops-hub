@@ -1,4 +1,16 @@
-import { ticketUrl, dueDateLabel } from '../utils/helpers';
+import { ticketUrl, dueDateLabel, STATUS_NAMES } from '../utils/helpers';
+
+const STATUS_COLORS = {
+  2:  'bg-blue-100 text-blue-700',
+  3:  'bg-purple-100 text-purple-700',
+  6:  'bg-amber-100 text-amber-700',
+  7:  'bg-orange-100 text-orange-700',
+  8:  'bg-teal-100 text-teal-700',
+  9:  'bg-indigo-100 text-indigo-700',
+  10: 'bg-cyan-100 text-cyan-700',
+  11: 'bg-pink-100 text-pink-700',
+  12: 'bg-red-100 text-red-700',
+};
 
 function FdBtn({ domain, id }) {
   return (
@@ -46,6 +58,7 @@ export default function UrgentPanel({ tickets, agents, domain, onTicketClick }) 
                 <th className="text-left py-2 px-1">Assunto</th>
                 <th className="text-left py-2 px-1">Cliente</th>
                 <th className="text-left py-2 px-1">Agente</th>
+                <th className="text-left py-2 px-1">Status</th>
                 <th className="text-left py-2 px-1">SLA</th>
                 <th className="py-2 px-1 w-6"></th>
               </tr>
@@ -72,6 +85,12 @@ export default function UrgentPanel({ tickets, agents, domain, onTicketClick }) 
                         ? <span className="text-gray-600">{agentMap.get(t.responder_id) || '—'}</span>
                         : <span className="text-amber-500 font-medium">Sem agente</span>
                       }
+                    </td>
+                    <td className="py-1.5 px-1">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap font-medium
+                        ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {STATUS_NAMES[t.status] || `Status ${t.status}`}
+                      </span>
                     </td>
                     <td className={`py-1.5 px-1 text-xs whitespace-nowrap ${due.cls}`}>
                       {due.text}
